@@ -112,24 +112,20 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
     """
     Launches an interactive widget interface to test and adjust HSV bounds
     and minimum area threshold for object detection. Displays the selected
-    frame with annotations and a hue color wheel next to it.
+    frame with annotations and a hue gradient bar for visual reference.
     """
     import matplotlib.pyplot as plt
     import ipywidgets as widgets
     from IPython.display import display
 
-    def generate_hue_wheel(radius=100):
-        """Creates an RGB hue wheel image as a NumPy array."""
-        y, x = np.ogrid[-radius:radius, -radius:radius]
-        mask = x**2 + y**2 <= radius**2
-        angle = (np.arctan2(-y, x) + np.pi) * 180 / np.pi
-        hsv = np.zeros((2*radius, 2*radius, 3), dtype=np.uint8)
-        hsv[..., 0] = angle.astype(np.uint8)
+    def generate_hue_bar(width=360, height=30):
+        """Creates a horizontal hue gradient bar from HSV to RGB."""
+        hue = np.linspace(0, 180, width, dtype=np.uint8)
+        hsv = np.zeros((height, width, 3), dtype=np.uint8)
+        hsv[..., 0] = hue[None, :]
         hsv[..., 1] = 255
         hsv[..., 2] = 255
-        hsv[~mask] = 0
         rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-        rgb[~mask] = 255  # white background outside circle
         return rgb
 
     cap = cv2.VideoCapture(video_path)
@@ -159,7 +155,7 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
     ub_label = widgets.Label()
     output = widgets.Output()
 
-    hue_wheel_img = generate_hue_wheel(radius=100)
+    hue_bar_img = generate_hue_bar()
 
     def update_display(lower_h, lower_s, lower_v,
                        upper_h, upper_s, upper_v,
@@ -173,19 +169,28 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
         processed, _, _ = track_colored_object(frame, np.array(lower), np.array(upper), min_contour_area)
         rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
 
-        avg_hsv = np.array([(lower[0]+upper[0])//2, (lower[1]+upper[1])//2, (lower[2]+upper[2])//2], dtype=np.uint8)
-        avg_rgb = cv2.cvtColor(avg_hsv.reshape((1,1,3)), cv2.COLOR_HSV2RGB).reshape(3) / 255.0
-
         with output:
             output.clear_output(wait=True)
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6), gridspec_kw={'width_ratios': [3, 1]})
-            ax1.imshow(rgb)
-            ax1.set_title(f"Frame {frame_index}")
-            ax1.axis('off')
+            fig, axs = plt.subplots(2, 1, figsize=(8, 8), gridspec_kw={"height_ratios": [4, 1]})
 
-            ax2.imshow(hue_wheel_img)
-            ax2.set_title("Hue wheel")
-            ax2.axis('off')
+            # Image with annotations
+            axs[0].imshow(rgb)
+            axs[0].set_title(f"Frame {frame_index}")
+            axs[0].axis('off')
+
+            # Hue bar with ticks
+            axs[1].imshow(hue_bar_img, aspect='auto')
+            axs[1].set_title("Hue values (OpenCV scale 0–180)")
+            axs[1].set_yticks([])
+
+            ticks = np.linspace(0, hue_bar_img.shape[1] - 1, 10, dtype=int)
+            tick_labels = np.linspace(0, 180, 10, dtype=int)
+            axs[1].set_xticks(ticks)
+            axs[1].set_xticklabels(tick_labels)
+
+            # Optional: show selected hue range
+            axs[1].axvline(lower[0] * (hue_bar_img.shape[1] / 180), color='black', linestyle='--')
+            axs[1].axvline(upper[0] * (hue_bar_img.shape[1] / 180), color='black', linestyle='--')
 
             plt.tight_layout()
             plt.show()
