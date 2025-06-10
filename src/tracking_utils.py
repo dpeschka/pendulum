@@ -191,7 +191,7 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
             # Optional: show selected hue range
             axs[1].axvline(lower[0] * (hue_bar_img.shape[1] / 180), color='black', linestyle='--')
             axs[1].axvline(upper[0] * (hue_bar_img.shape[1] / 180), color='black', linestyle='--')
-
+            plt.xlim([0,180])
             plt.tight_layout()
             plt.show()
 
