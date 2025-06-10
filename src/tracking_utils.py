@@ -108,19 +108,29 @@ def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotat
     return times, xs, ys
 
 # === Optional interactive widget interface ===
-
 def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
     """
     Launches an interactive widget interface to test and adjust HSV bounds
-    and minimum area threshold for object detection.
-
-    Args:
-        video_path (str): Path to the input video.
-        max_frames_to_load (int): Number of frames to preview for tuning.
+    and minimum area threshold for object detection. Displays the selected
+    frame with annotations and a hue color wheel next to it.
     """
     import matplotlib.pyplot as plt
     import ipywidgets as widgets
     from IPython.display import display
+
+    def generate_hue_wheel(radius=100):
+        """Creates an RGB hue wheel image as a NumPy array."""
+        y, x = np.ogrid[-radius:radius, -radius:radius]
+        mask = x**2 + y**2 <= radius**2
+        angle = (np.arctan2(-y, x) + np.pi) * 180 / np.pi
+        hsv = np.zeros((2*radius, 2*radius, 3), dtype=np.uint8)
+        hsv[..., 0] = angle.astype(np.uint8)
+        hsv[..., 1] = 255
+        hsv[..., 2] = 255
+        hsv[~mask] = 0
+        rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+        rgb[~mask] = 255  # white background outside circle
+        return rgb
 
     cap = cv2.VideoCapture(video_path)
     frames_bgr = []
@@ -135,6 +145,7 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
         print(f"Could not read frames from {video_path}")
         return
 
+    # Widget controls
     lower_h = widgets.IntSlider(value=140, min=0, max=180, description='Lower H')
     lower_s = widgets.IntSlider(value=50, min=0, max=255, description='Lower S')
     lower_v = widgets.IntSlider(value=50, min=0, max=255, description='Lower V')
@@ -147,6 +158,8 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
     lb_label = widgets.Label()
     ub_label = widgets.Label()
     output = widgets.Output()
+
+    hue_wheel_img = generate_hue_wheel(radius=100)
 
     def update_display(lower_h, lower_s, lower_v,
                        upper_h, upper_s, upper_v,
@@ -165,18 +178,15 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
 
         with output:
             output.clear_output(wait=True)
-            fig, ax = plt.subplots(figsize=(6, 6))
-            ax.imshow(rgb)
-            ax.set_title(f"Frame {frame_index}")
-            ax.axis('off')
-            inset = ax.inset_axes([0.02, 0.02, 0.1, 0.1])
-            inset.imshow(np.ones((10, 10, 3), dtype=np.float32) * avg_rgb)
-            inset.set_title("HSV avg", fontsize=6)
-            inset.set_xticks([])
-            inset.set_yticks([])
-            for spine in inset.spines.values():
-                spine.set_edgecolor('black')
-                spine.set_linewidth(1)
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6), gridspec_kw={'width_ratios': [3, 1]})
+            ax1.imshow(rgb)
+            ax1.set_title(f"Frame {frame_index}")
+            ax1.axis('off')
+
+            ax2.imshow(hue_wheel_img)
+            ax2.set_title("Hue wheel")
+            ax2.axis('off')
+
             plt.tight_layout()
             plt.show()
 
