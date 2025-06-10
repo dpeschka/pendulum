@@ -1,11 +1,14 @@
 """
-video_tracking_utils.py
+tracking_utils.py
 ------------------
-Utility functions for processing video and tracking a colored object by HSV bounds.
+Provides utility functions for tracking colored objects in video frames
+using HSV color thresholds, and an optional interactive widget for HSV tuning.
 """
 
 import cv2
 import numpy as np
+
+# === Core functionality ===
 
 def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area):
     """
@@ -103,3 +106,97 @@ def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotat
     cap.release()
     out.release()
     return times, xs, ys
+
+# === Optional interactive widget interface ===
+
+def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
+    """
+    Launches an interactive widget interface to test and adjust HSV bounds
+    and minimum area threshold for object detection.
+
+    Args:
+        video_path (str): Path to the input video.
+        max_frames_to_load (int): Number of frames to preview for tuning.
+    """
+    import matplotlib.pyplot as plt
+    import ipywidgets as widgets
+    from IPython.display import display
+
+    cap = cv2.VideoCapture(video_path)
+    frames_bgr = []
+    while len(frames_bgr) < max_frames_to_load:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frames_bgr.append(frame)
+    cap.release()
+
+    if not frames_bgr:
+        print(f"Could not read frames from {video_path}")
+        return
+
+    lower_h = widgets.IntSlider(value=140, min=0, max=180, description='Lower H')
+    lower_s = widgets.IntSlider(value=50, min=0, max=255, description='Lower S')
+    lower_v = widgets.IntSlider(value=50, min=0, max=255, description='Lower V')
+    upper_h = widgets.IntSlider(value=180, min=0, max=180, description='Upper H')
+    upper_s = widgets.IntSlider(value=255, min=0, max=255, description='Upper S')
+    upper_v = widgets.IntSlider(value=255, min=0, max=255, description='Upper V')
+    min_area_slider = widgets.IntSlider(value=1500, min=0, max=5000, step=100, description='Min Area:')
+    frame_idx_slider = widgets.IntSlider(value=0, min=0, max=len(frames_bgr)-1, description='Frame:')
+
+    lb_label = widgets.Label()
+    ub_label = widgets.Label()
+    output = widgets.Output()
+
+    def update_display(lower_h, lower_s, lower_v,
+                       upper_h, upper_s, upper_v,
+                       min_contour_area, frame_index):
+        lower = np.minimum([lower_h, lower_s, lower_v], [upper_h, upper_s, upper_v])
+        upper = np.maximum([lower_h, lower_s, lower_v], [upper_h, upper_s, upper_v])
+        lb_label.value = f"Lower HSV: {lower}"
+        ub_label.value = f"Upper HSV: {upper}"
+
+        frame = frames_bgr[frame_index].copy()
+        processed, _, _ = track_colored_object(frame, np.array(lower), np.array(upper), min_contour_area)
+        rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
+
+        avg_hsv = np.array([(lower[0]+upper[0])//2, (lower[1]+upper[1])//2, (lower[2]+upper[2])//2], dtype=np.uint8)
+        avg_rgb = cv2.cvtColor(avg_hsv.reshape((1,1,3)), cv2.COLOR_HSV2RGB).reshape(3) / 255.0
+
+        with output:
+            output.clear_output(wait=True)
+            fig, ax = plt.subplots(figsize=(6, 6))
+            ax.imshow(rgb)
+            ax.set_title(f"Frame {frame_index}")
+            ax.axis('off')
+            inset = ax.inset_axes([0.02, 0.02, 0.1, 0.1])
+            inset.imshow(np.ones((10, 10, 3), dtype=np.float32) * avg_rgb)
+            inset.set_title("HSV avg", fontsize=6)
+            inset.set_xticks([])
+            inset.set_yticks([])
+            for spine in inset.spines.values():
+                spine.set_edgecolor('black')
+                spine.set_linewidth(1)
+            plt.tight_layout()
+            plt.show()
+
+    ui = widgets.VBox([
+        lb_label,
+        ub_label,
+        widgets.HBox([lower_h, lower_s, lower_v]),
+        widgets.HBox([upper_h, upper_s, upper_v]),
+        min_area_slider,
+        frame_idx_slider
+    ])
+
+    out = widgets.interactive_output(update_display, {
+        "lower_h": lower_h, "lower_s": lower_s, "lower_v": lower_v,
+        "upper_h": upper_h, "upper_s": upper_s, "upper_v": upper_v,
+        "min_contour_area": min_area_slider,
+        "frame_index": frame_idx_slider
+    })
+
+    display(ui, output, out)
+    update_display(lower_h.value, lower_s.value, lower_v.value,
+                   upper_h.value, upper_s.value, upper_v.value,
+                   min_area_slider.value, frame_idx_slider.value)
