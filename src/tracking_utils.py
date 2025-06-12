@@ -10,7 +10,7 @@ import numpy as np
 
 # === Core functionality ===
 
-def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area):
+def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, cross_color=(0, 255, 0), contour_color=(0, 0, 0)):
     """
     Detects and tracks the largest object within the specified HSV range.
 
@@ -19,6 +19,8 @@ def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area):
         lower_hsv (np.ndarray): Lower HSV threshold for object color.
         upper_hsv (np.ndarray): Upper HSV threshold for object color.
         min_contour_area (int): Minimum area to accept a contour as a valid object.
+        cross_color (tuple): BGR color for the cross marker (default: (0, 255, 0) - green).
+        contour_color (tuple): BGR color for the contour outline (default: (0, 0, 0) - black).
 
     Returns:
         tuple: (processed_frame, (cX, cY), object_found)
@@ -42,9 +44,9 @@ def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area):
         return frame, None, False
 
     cX, cY = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
-    cv2.drawContours(frame, [largest], -1, (0, 0, 0), 2)
-    cv2.line(frame, (cX - 20, cY), (cX + 20, cY), (0, 255, 0), 2)
-    cv2.line(frame, (cX, cY - 20), (cX, cY + 20), (0, 255, 0), 2)
+    cv2.drawContours(frame, [largest], -1, contour_color, 2)
+    cv2.line(frame, (cX - 20, cY), (cX + 20, cY), cross_color, 2)
+    cv2.line(frame, (cX, cY - 20), (cX, cY + 20), cross_color, 2)
 
     return frame, (cX, cY), True
 
