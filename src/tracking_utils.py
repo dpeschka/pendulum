@@ -10,7 +10,7 @@ import numpy as np
 
 # === Core functionality ===
 
-def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, cross_color=(0, 255, 0), contour_color=(0, 0, 0)):
+def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, drawing_params):
     """
     Detects and tracks the largest object within the specified HSV range.
 
@@ -19,8 +19,9 @@ def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, cross_co
         lower_hsv (np.ndarray): Lower HSV threshold for object color.
         upper_hsv (np.ndarray): Upper HSV threshold for object color.
         min_contour_area (int): Minimum area to accept a contour as a valid object.
-        cross_color (tuple): BGR color for the cross marker (default: (0, 255, 0) - green).
-        contour_color (tuple): BGR color for the contour outline (default: (0, 0, 0) - black).
+        drawing_params (dict): Dictionary with drawing parameters:
+            - 'cross_color' (tuple): BGR color for the cross marker
+            - 'contour_color' (tuple): BGR color for the contour outline
 
     Returns:
         tuple: (processed_frame, (cX, cY), object_found)
@@ -28,6 +29,9 @@ def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, cross_co
             - (cX, cY) (tuple[int, int] or None): Coordinates of the object's centroid.
             - object_found (bool): Whether a valid object was detected.
     """
+    cross_color = drawing_params['cross_color']
+    contour_color = drawing_params['contour_color']
+    
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -50,7 +54,7 @@ def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, cross_co
 
     return frame, (cX, cY), True
 
-def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotate):
+def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotate, drawing_params={'cross_color': (0, 255, 0), 'contour_color': (0, 0, 0)}):
     """
     Processes a video, tracks a colored object, saves the annotated output video,
     and returns time-series data of object positions.
@@ -62,6 +66,8 @@ def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotat
         upper_hsv (np.ndarray): Upper HSV threshold for object color.
         min_area (int): Minimum area for valid object contour.
         rotate (bool): Whether to rotate frames 90° clockwise before processing.
+        drawing_params (dict): Dictionary with drawing parameters passed to track_colored_object.
+            Default: {'cross_color': (0, 255, 0), 'contour_color': (0, 0, 0)}
 
     Returns:
         tuple: (times, x_positions, y_positions)
@@ -94,7 +100,7 @@ def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotat
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
         t_sec = frame_count / fps
-        processed, pos, valid = track_colored_object(frame, lower_hsv, upper_hsv, min_area)
+        processed, pos, valid = track_colored_object(frame, lower_hsv, upper_hsv, min_area, drawing_params)
         resized = cv2.resize(processed, (new_w, new_h))
         out.write(resized)
 
