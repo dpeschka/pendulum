@@ -9,11 +9,11 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.integrate import solve_ivp
 
-def solve_pendulum(times, length, damping, theta0, omega0):
+def solve_pendulum(times, length, damping, theta0, omega0, tilt=0.0):
     """Solve damped pendulum ODE and return angles"""
     def ode(t, y):
         theta, theta_dot = y
-        return [theta_dot, -(9.81/length) * np.sin(theta) - damping * theta_dot]
+        return [theta_dot, -(9.81/length) * np.sin(theta - tilt) - damping * theta_dot]
     
     sol = solve_ivp(ode, [times[0], times[-1]], [theta0, omega0], t_eval=times)
     return sol.y[0] if sol.success else np.zeros_like(times)
@@ -49,14 +49,9 @@ def fit_pendulum(times, x_positions, y_positions):
     def pendulum_cost(params):
         length, damping, theta0, omega0, tilt = params
         
-        # Apply rotation to compensate for camera tilt
-        cos_t, sin_t = np.cos(-tilt), np.sin(-tilt)
-        dx_rot = dx * cos_t - dy * sin_t
-        dy_rot = dx * sin_t + dy * cos_t
-        
-        # Calculate angles and compare with prediction
-        angles_measured = np.arctan2(dx_rot, dy_rot)
-        angles_predicted = solve_pendulum(times, length, damping, theta0, omega0)
+        # Calculate angles directly without coordinate rotation
+        angles_measured = np.arctan2(dx, dy)
+        angles_predicted = solve_pendulum(times, length, damping, theta0, omega0, tilt)
         
         return angles_predicted - angles_measured
     
@@ -82,18 +77,13 @@ def fit_pendulum(times, x_positions, y_positions):
 
 def predict_positions(times, fit_result):
     """Predict pendulum positions from fitted parameters"""
-    # Solve pendulum motion
+    # Solve pendulum motion with tilt
     angles = solve_pendulum(times, fit_result['length'], fit_result['damping'], 
-                           fit_result['theta0'], fit_result['omega0'])
+                           fit_result['theta0'], fit_result['omega0'], fit_result['tilt_angle'])
     
     # Convert to cartesian coordinates
     x_pend = fit_result['radius_pixels'] * np.sin(angles)
     y_pend = fit_result['radius_pixels'] * np.cos(angles)
     
-    # Apply camera tilt and translate to image coordinates
-    tilt = fit_result['tilt_angle']
-    cos_t, sin_t = np.cos(tilt), np.sin(tilt)
-    x_rot = x_pend * cos_t - y_pend * sin_t
-    y_rot = x_pend * sin_t + y_pend * cos_t
-    
-    return (fit_result['pivot_x'] + x_rot, fit_result['pivot_y'] + y_rot)
+    # Translate to image coordinates (no rotation needed)
+    return (fit_result['pivot_x'] + x_pend, fit_result['pivot_y'] + y_pend)
