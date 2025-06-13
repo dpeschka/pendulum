@@ -116,11 +116,16 @@ def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotat
     return times, xs, ys
 
 # === Optional interactive widget interface ===
-def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
+def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, drawing_params={'cross_color': (0, 255, 0), 'contour_color': (0, 0, 0)}):
     """
     Launches an interactive widget interface to test and adjust HSV bounds
     and minimum area threshold for object detection. Displays the selected
     frame with annotations and a hue gradient bar for visual reference.
+    
+    Args:
+        video_path (str): Path to the input video file.
+        max_frames_to_load (int): Maximum number of frames to load from the video.
+        drawing_params (dict): Dictionary with drawing parameters for visualization.
     """
     import matplotlib.pyplot as plt
     import ipywidgets as widgets
@@ -174,7 +179,7 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100):
         ub_label.value = f"Upper HSV: {upper}"
 
         frame = frames_bgr[frame_index].copy()
-        processed, _, _ = track_colored_object(frame, np.array(lower), np.array(upper), min_contour_area)
+        processed, _, _ = track_colored_object(frame, np.array(lower), np.array(upper), min_contour_area, drawing_params)
         rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
 
         with output:
