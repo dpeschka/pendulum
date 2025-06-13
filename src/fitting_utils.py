@@ -27,14 +27,14 @@ def solve_pendulum(times, length, damping, theta0, omega0):
 
 def residual_function(params, times, x_positions, y_positions):
     """Residual for least squares fitting"""
-    length_pixels, damping, theta0, omega0, pivot_x, pivot_y = params
+    length, damping, theta0, omega0, pivot_x, pivot_y, radius_pixels = params
     try:
         # Convert to angles
         dx = np.array(x_positions) - pivot_x
         dy = np.array(y_positions) - pivot_y
         angles = np.arctan2(dx, dy)
         
-        predicted_angles = solve_pendulum(times, length_pixels, damping, theta0, omega0)
+        predicted_angles = solve_pendulum(times, length, damping, theta0, omega0)
         return predicted_angles - angles
     except:
         return np.full_like(x_positions, 1e6)
@@ -49,8 +49,8 @@ def fit_pendulum(times, x_positions, y_positions, pivot_x_guess=None, pivot_y_gu
         pivot_x_guess, pivot_y_guess: Initial guess for pivot (optional)
     
     Returns:
-        dict: {'length_pixels': L, 'damping': γ, 'theta0': θ₀, 'omega0': ω₀, 
-               'pivot_x': px, 'pivot_y': py, 'success': bool, 'residual': r}
+        dict: {'length': L [m], 'damping': γ, 'theta0': θ₀, 'omega0': ω₀, 
+               'pivot_x': px, 'pivot_y': py, 'radius_pixels': r_pix, 'success': bool, 'residual': r}
     """
     x_arr = np.array(x_positions)
     y_arr = np.array(y_positions)
@@ -61,28 +61,31 @@ def fit_pendulum(times, x_positions, y_positions, pivot_x_guess=None, pivot_y_gu
     if pivot_y_guess is None:
         pivot_y_guess = np.min(y_arr) - 200  # assume pivot above the motion
     
-    # Estimate pendulum length from range
-    amplitude_pixels = np.sqrt(np.var(x_arr) + np.var(y_arr))
-    length_pixels_guess = max(400, amplitude_pixels * 2)  # typical 400 pixel length
+    # Estimate pixel radius from amplitude
+    radius_pixels_guess = np.sqrt(np.var(x_arr) + np.var(y_arr))
     
-    # Initial guess: [length_pixels, damping, theta0, omega0, pivot_x, pivot_y]
-    x0 = [length_pixels_guess, 0.1, 0.0, 0.0, pivot_x_guess, pivot_y_guess]
+    # Physical length guess (meters)
+    length_guess = 1.0  # assume 1 meter pendulum
     
-    # Bounds: length [50, 1000], damping [0, 2], angles [-π, π], omega [-10, 10], pivot ranges
+    # Initial guess: [length, damping, theta0, omega0, pivot_x, pivot_y, radius_pixels]
+    x0 = [length_guess, 0.1, 0.0, 0.0, pivot_x_guess, pivot_y_guess, radius_pixels_guess]
+    
+    # Bounds for fitting
     x_range = np.ptp(x_arr) + 200
     y_range = np.ptp(y_arr) + 200
-    bounds = ([0.05, 0.0, -np.pi, -10.0, np.min(x_arr) - x_range, -5000.0], 
-              [2.00, 5.0, np.pi, 10.0, np.max(x_arr) + x_range, 5000.0])
+    bounds = ([0.1, 0.0, -np.pi, -10.0, np.min(x_arr) - x_range, -5000.0, 50.0], 
+              [10.0, 5.0, np.pi, 10.0, np.max(x_arr) + x_range, 5000.0, 1000.0])
     
-    result = least_squares(residual_function, x0, args=(times, x_positions, y_positions))#, bounds=bounds)
+    result = least_squares(residual_function, x0, args=(times, x_positions, y_positions), bounds=bounds)
     
     return {
-        'length_pixels': result.x[0],
+        'length': result.x[0],  # physical length in meters
         'damping': result.x[1], 
         'theta0': result.x[2],
         'omega0': result.x[3],
         'pivot_x': result.x[4],
         'pivot_y': result.x[5],
+        'radius_pixels': result.x[6],  # conversion factor to pixels
         'success': result.success,
         'residual': np.linalg.norm(result.fun)
     }
@@ -98,10 +101,11 @@ def predict_positions(times, fit_result):
     Returns:
         tuple: (x_positions, y_positions) arrays
     """
-    angles = solve_pendulum(times, fit_result['length_pixels'], fit_result['damping'], 
+    angles = solve_pendulum(times, fit_result['length'], fit_result['damping'], 
                            fit_result['theta0'], fit_result['omega0'])
     
-    x_positions = fit_result['pivot_x'] + fit_result['length_pixels'] * np.sin(angles)
-    y_positions = fit_result['pivot_y'] + fit_result['length_pixels'] * np.cos(angles)
+    # Convert angles to pixel positions using radius_pixels
+    x_positions = fit_result['pivot_x'] + fit_result['radius_pixels'] * np.sin(angles)
+    y_positions = fit_result['pivot_y'] + fit_result['radius_pixels'] * np.cos(angles)
     
     return x_positions, y_positions
