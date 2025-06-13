@@ -71,8 +71,8 @@ def fit_pendulum(times, x_positions, y_positions, pivot_x_guess=None, pivot_y_gu
     # Bounds: length [50, 1000], damping [0, 2], angles [-π, π], omega [-10, 10], pivot ranges
     x_range = np.ptp(x_arr) + 200
     y_range = np.ptp(y_arr) + 200
-    bounds = ([50.0, 0.0, -np.pi, -10.0, np.min(x_arr) - x_range, -5000.0], 
-              [1000.0, 2.0, np.pi, 10.0, np.max(x_arr) + x_range, 5000.0])
+    bounds = ([0.05, 0.0, -np.pi, -10.0, np.min(x_arr) - x_range, -5000.0], 
+              [2.00, 5.0, np.pi, 10.0, np.max(x_arr) + x_range, 5000.0])
     
     result = least_squares(residual_function, x0, args=(times, x_positions, y_positions), bounds=bounds)
     
