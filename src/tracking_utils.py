@@ -157,7 +157,7 @@ def add_timer(video_path, output_path, drawing_params={'timer_color': (255, 255,
         
         # Add timer text to lower left corner before resizing
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1
+        font_scale = 2
         thickness = 2
         
         # Position in lower left corner with some padding
