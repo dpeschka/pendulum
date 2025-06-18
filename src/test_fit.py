@@ -10,9 +10,15 @@ from fitting_utils import fit_pendulum, predict_positions
 data = np.load('../data/pendulum_data.npz')
 t, x, y = data['t'], data['x'], data['y']
 
+
+def ode_pendulum(t, y, length, damping, tilt):
+        theta, theta_dot = y
+        return [theta_dot, -(9.81/length) * np.sin(theta - tilt) - damping * theta_dot]
+
+
 # Fit and predict
-fit_result = fit_pendulum(t, x, y)
-x_pred, y_pred = predict_positions(t, fit_result)
+fit_result = fit_pendulum(ode_pendulum,t, x, y)
+x_pred, y_pred = predict_positions(ode_pendulum,t, fit_result)
 
 # Parameters
 print(f"L={fit_result['length']:.3f}m, d={fit_result['damping']:.3f}, tilt={np.degrees(fit_result['tilt_angle']):.1f}°")

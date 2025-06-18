@@ -9,18 +9,30 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.integrate import solve_ivp
 
-def solve_pendulum(times, length, damping, theta0, omega0, tilt=0.0):
+def solve_pendulum(ode_func,times, length, damping, theta0, omega0, tilt=0.0):
     """Solve damped pendulum ODE and return angles"""
     def ode(t, y):
         theta, theta_dot = y
-        return [theta_dot, -(9.81/length) * np.sin(theta - tilt) - damping * theta_dot]
+        dydt = ode_func(t, y, length, damping, tilt)
+        return dydt
+
+    #def ode(t, y):
+    #    theta, theta_dot = y
+    #    return [theta_dot, -(9.81/length) * np.sin(theta - tilt) - damping * theta_dot]
     
     sol = solve_ivp(ode, [times[0], times[-1]], [theta0, omega0], t_eval=times)
     return sol.y[0] if sol.success else np.zeros_like(times)
 
-def fit_pendulum(times, x_positions, y_positions):
+def fit_pendulum(ode_func,times, x_positions, y_positions, initial_values=None):
     """
     Fit pendulum motion to tracking data using two-step optimization.
+    
+    Args:
+        times: Time array
+        x_positions: X coordinates of pendulum bob
+        y_positions: Y coordinates of pendulum bob
+        initial_values: Initial guess for parameters in format 
+                        {'length': float, 'damping': float, 'theta0': float, 'omega0': float, 'tilt': float}
     
     Returns:
         dict: Fitted parameters including length, damping, pivot position, etc.
@@ -46,17 +58,28 @@ def fit_pendulum(times, x_positions, y_positions):
     theta0_est = angles_data[0]
     omega0_est = (angles_data[1] - angles_data[0]) / (times[1] - times[0]) if len(times) > 1 else 0.0
     
+    if initial_values is None:
+        initial_values = {
+            'length': 1.0,
+            'damping': 0.1,
+            'theta0': theta0_est,
+            'omega0': omega0_est,
+            'tilt': 0.0
+        }
+    
+    # Convert initial values to array format for least_squares
+    x0 = [initial_values['length'], initial_values['damping'], initial_values['theta0'], initial_values['omega0'], initial_values['tilt']]
+    
     def pendulum_cost(params):
         length, damping, theta0, omega0, tilt = params
         
         # Calculate angles directly without coordinate rotation
         angles_measured = np.arctan2(dx, dy)
-        angles_predicted = solve_pendulum(times, length, damping, theta0, omega0, tilt)
+        angles_predicted = solve_pendulum(ode_func,times, length, damping, theta0, omega0, tilt)
         
         return angles_predicted - angles_measured
     
     # Optimize pendulum parameters
-    x0 = [1.0, 0.1, theta0_est, omega0_est, 0.0]
     bounds = ([0.01, 0.0, -np.pi, -20.0, -np.pi/6], 
               [20.0, 5.0, np.pi, 20.0, np.pi/6])
     
@@ -75,10 +98,10 @@ def fit_pendulum(times, x_positions, y_positions):
         'residual': np.linalg.norm(result.fun)
     }
 
-def predict_positions(times, fit_result):
+def predict_positions(ode_func,times, fit_result):
     """Predict pendulum positions from fitted parameters"""
     # Solve pendulum motion with tilt
-    angles = solve_pendulum(times, fit_result['length'], fit_result['damping'], 
+    angles = solve_pendulum(ode_func,times, fit_result['length'], fit_result['damping'], 
                            fit_result['theta0'], fit_result['omega0'], fit_result['tilt_angle'])
     
     # Convert to cartesian coordinates
