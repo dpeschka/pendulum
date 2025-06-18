@@ -90,7 +90,7 @@ def fit_pendulum(ode_func,times, x_positions, y_positions, initial_values=None):
         'damping': result.x[1], 
         'theta0': result.x[2],
         'omega0': result.x[3],
-        'tilt_angle': result.x[4],
+        'tilt': result.x[4],
         'pivot_x': px,
         'pivot_y': py,
         'radius_pixels': radius,
@@ -102,7 +102,7 @@ def predict_positions(ode_func,times, fit_result):
     """Predict pendulum positions from fitted parameters"""
     # Solve pendulum motion with tilt
     angles = solve_pendulum(ode_func,times, fit_result['length'], fit_result['damping'], 
-                           fit_result['theta0'], fit_result['omega0'], fit_result['tilt_angle'])
+                           fit_result['theta0'], fit_result['omega0'], fit_result['tilt'])
     
     # Convert to cartesian coordinates
     x_pend = fit_result['radius_pixels'] * np.sin(angles)
