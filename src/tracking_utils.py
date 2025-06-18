@@ -115,6 +115,69 @@ def process_video(video_path, output_path, lower_hsv, upper_hsv, min_area, rotat
     out.release()
     return times, xs, ys
 
+def add_timer(video_path, output_path, drawing_params={'timer_color': (255, 255, 255)}):
+    """
+    Add a timer overlay to a video showing elapsed time in seconds.
+    Uses the same resolution reduction approach as process_video.
+    
+    Args:
+        video_path (str): Path to input video file
+        output_path (str): Path for output video file
+        drawing_params (dict): Parameters for drawing, expects 'timer_color' as (r,g,b) tuple
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise IOError(f"Cannot open video file: {video_path}")
+    
+    # Get video properties
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    
+    # Use same resolution reduction as process_video
+    new_w = 640
+    new_h = int(height * (new_w / width))
+    
+    # Use same codec as process_video for consistency
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), int(fps), (new_w, new_h))
+    
+    frame_count = 0
+    timer_color = drawing_params.get('timer_color', (255, 255, 255))
+    # Convert RGB to BGR for OpenCV
+    timer_color_bgr = (timer_color[2], timer_color[1], timer_color[0])
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Calculate time in seconds
+        time_seconds = frame_count / fps
+        timer_text = f"{time_seconds:.2f}s"
+        
+        # Add timer text to lower left corner before resizing
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        thickness = 2
+        
+        # Position in lower left corner with some padding
+        x = 10
+        y = height - 20
+        
+        # Add text to frame
+        cv2.putText(frame, timer_text, (x, y), font, font_scale, timer_color_bgr, thickness)
+        
+        # Resize frame to match output dimensions (same as process_video)
+        resized_frame = cv2.resize(frame, (new_w, new_h))
+        
+        # Write frame to output video
+        out.write(resized_frame)
+        frame_count += 1
+    
+    # Release everything
+    cap.release()
+    out.release()
+
 # === Optional interactive widget interface ===
 def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, drawing_params={'cross_color': (0, 255, 0), 'contour_color': (0, 0, 0)}):
     """
