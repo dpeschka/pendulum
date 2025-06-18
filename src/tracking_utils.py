@@ -160,9 +160,15 @@ def add_timer(video_path, output_path, drawing_params={'timer_color': (255, 255,
         font_scale = 2
         thickness = 2
         
+        # Get text size for background rectangle
+        (text_width, text_height), baseline = cv2.getTextSize(timer_text, font, font_scale, thickness)
+        
         # Position in lower left corner with some padding
         x = 10
         y = height - 20
+        
+        # Draw white background rectangle
+        cv2.rectangle(frame, (x - 5, y - text_height - 5), (x + text_width + 5, y + baseline + 5), (255, 255, 255), -1)
         
         # Add text to frame
         cv2.putText(frame, timer_text, (x, y), font, font_scale, timer_color_bgr, thickness)
