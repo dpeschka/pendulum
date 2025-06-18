@@ -53,4 +53,4 @@ def add_timer(video_path, output_path, drawing_params={'timer_color': (255, 255,
     # Release everything
     cap.release()
     out.release()
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
