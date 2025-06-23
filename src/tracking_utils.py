@@ -10,6 +10,43 @@ import numpy as np
 
 # === Core functionality ===
 
+def detect_color_object(frame, lower=(0, 50, 50), upper=(179, 255, 255)):
+    # Convert to HSV color space
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # Mask colorful pixels (i.e., not gray)
+    mask = cv2.inRange(hsv, lower, upper)
+
+    # Morphological filtering to clean up mask
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, kernel)
+    
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if not contours:
+        print("No colorful object detected.")
+        return frame, None, None
+
+    # Largest contour assumed to be pendulum
+    largest_contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(largest_contour)
+
+    # Draw bounding box
+    result = frame.copy()
+    cv2.rectangle(result, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    # Compute average HSV color inside bounding box
+    pendulum_region = hsv[y:y+h, x:x+w]
+    region_mask = mask[y:y+h, x:x+w]
+
+    # Mask the HSV region to only colorful parts
+    colorful_pixels = pendulum_region[region_mask > 0]
+    avg_hsv = np.mean(colorful_pixels, axis=0).astype(int)
+
+    return tuple(avg_hsv), mask
+    
 def track_colored_object(frame, lower_hsv, upper_hsv, min_contour_area, drawing_params):
     """
     Detects and tracks the largest object within the specified HSV range.
