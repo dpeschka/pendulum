@@ -227,6 +227,7 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, dra
     Launches an interactive widget interface to test and adjust HSV bounds
     and minimum area threshold for object detection. Displays the selected
     frame with annotations and a hue gradient bar for visual reference.
+    Includes crosshair positioning to sample HSV values at specific locations.
     
     Args:
         video_path (str): Path to the input video file.
@@ -260,6 +261,9 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, dra
         print(f"Could not read frames from {video_path}")
         return
 
+    # Get frame dimensions for crosshair sliders
+    frame_height, frame_width = frames_bgr[0].shape[:2]
+
     # Widget controls
     lower_h = widgets.IntSlider(value=140, min=0, max=180, description='Lower H')
     lower_s = widgets.IntSlider(value=50, min=0, max=255, description='Lower S')
@@ -269,22 +273,39 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, dra
     upper_v = widgets.IntSlider(value=255, min=0, max=255, description='Upper V')
     min_area_slider = widgets.IntSlider(value=1500, min=0, max=5000, step=100, description='Min Area:')
     frame_idx_slider = widgets.IntSlider(value=0, min=0, max=len(frames_bgr)-1, description='Frame:')
+    
+    # New crosshair position sliders
+    crosshair_x = widgets.IntSlider(value=frame_width//2, min=0, max=frame_width-1, description='Cross X:')
+    crosshair_y = widgets.IntSlider(value=frame_height//2, min=0, max=frame_height-1, description='Cross Y:')
 
     lb_label = widgets.Label()
     ub_label = widgets.Label()
+    hsv_sample_label = widgets.Label()
     output = widgets.Output()
 
     hue_bar_img = generate_hue_bar()
 
     def update_display(lower_h, lower_s, lower_v,
                        upper_h, upper_s, upper_v,
-                       min_contour_area, frame_index):
+                       min_contour_area, frame_index,
+                       cross_x, cross_y):
         lower = np.minimum([lower_h, lower_s, lower_v], [upper_h, upper_s, upper_v])
         upper = np.maximum([lower_h, lower_s, lower_v], [upper_h, upper_s, upper_v])
         lb_label.value = f"Lower HSV: {lower}"
         ub_label.value = f"Upper HSV: {upper}"
 
         frame = frames_bgr[frame_index].copy()
+        
+        # Get HSV value at crosshair position
+        hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hsv_at_cross = hsv_frame[cross_y, cross_x]
+        hsv_sample_label.value = f"HSV at crosshair ({cross_x}, {cross_y}): {hsv_at_cross}"
+        
+        # Draw crosshair on frame
+        cv2.line(frame, (cross_x - 20, cross_y), (cross_x + 20, cross_y), (255, 255, 0), 2)
+        cv2.line(frame, (cross_x, cross_y - 20), (cross_x, cross_y + 20), (255, 255, 0), 2)
+        cv2.circle(frame, (cross_x, cross_y), 3, (255, 255, 0), -1)
+        
         processed, _, _ = track_colored_object(frame, np.array(lower), np.array(upper), min_contour_area, drawing_params)
         rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
 
@@ -310,6 +331,10 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, dra
             # Optional: show selected hue range
             axs[1].axvline(lower[0] * (hue_bar_img.shape[1] / 180), color='black', linestyle='--')
             axs[1].axvline(upper[0] * (hue_bar_img.shape[1] / 180), color='black', linestyle='--')
+            
+            # Show HSV value at crosshair position on hue bar
+            axs[1].axvline(hsv_at_cross[0] * (hue_bar_img.shape[1] / 180), color='yellow', linestyle='-', linewidth=2)
+            
             plt.xlim([0,360])
             plt.tight_layout()
             plt.show()
@@ -317,20 +342,25 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, dra
     ui = widgets.VBox([
         lb_label,
         ub_label,
+        hsv_sample_label,
         widgets.HBox([lower_h, lower_s, lower_v]),
         widgets.HBox([upper_h, upper_s, upper_v]),
         min_area_slider,
-        frame_idx_slider
+        frame_idx_slider,
+        widgets.HBox([crosshair_x, crosshair_y])
     ])
 
     out = widgets.interactive_output(update_display, {
         "lower_h": lower_h, "lower_s": lower_s, "lower_v": lower_v,
         "upper_h": upper_h, "upper_s": upper_s, "upper_v": upper_v,
         "min_contour_area": min_area_slider,
-        "frame_index": frame_idx_slider
+        "frame_index": frame_idx_slider,
+        "cross_x": crosshair_x,
+        "cross_y": crosshair_y
     })
 
     display(ui, output, out)
     update_display(lower_h.value, lower_s.value, lower_v.value,
                    upper_h.value, upper_s.value, upper_v.value,
-                   min_area_slider.value, frame_idx_slider.value)
+                   min_area_slider.value, frame_idx_slider.value,
+                   crosshair_x.value, crosshair_y.value)
