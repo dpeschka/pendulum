@@ -340,14 +340,14 @@ def launch_hsv_tuning_widget(video_path="INPUT.MOV", max_frames_to_load=100, dra
             plt.show()
 
     ui = widgets.VBox([
-        lb_label,
-        ub_label,
-        hsv_sample_label,
+        #lb_label,
+        #ub_label,
+        #hsv_sample_label,
         widgets.HBox([lower_h, lower_s, lower_v]),
         widgets.HBox([upper_h, upper_s, upper_v]),
-        min_area_slider,
-        frame_idx_slider,
-        widgets.HBox([crosshair_x, crosshair_y])
+        widgets.HBox([min_area_slider,frame_idx_slider]),
+        widgets.HBox([crosshair_x, crosshair_y]),
+        hsv_sample_label
     ])
 
     out = widgets.interactive_output(update_display, {
